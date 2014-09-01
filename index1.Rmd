@@ -1,0 +1,256 @@
+---
+title       : Hubs Data
+author      : Olena Medvedyeva
+framework   : bootstrap    
+highlighter : prettify  
+hitheme     : twitter-bootstrap      
+widgets     : [mathjax]           
+ext_widgets : {rCharts: [libraries/nvd3]}
+mode        : standalone 
+
+---
+
+```{r setup, tidy = F, cache = FALSE, echo = FALSE, include=FALSE}
+
+library(bitops)
+library(RCurl)
+library(foreign)
+library(tseries)
+library(zoo)
+library(xts)
+library(TTR)
+library(timeDate)
+library(forecast)
+library(ggplot2)
+library(base64enc)
+library(devtools)
+library(rCharts)
+library(knitr)
+library(ggplot2)
+options(
+  rcharts.mode = 'iframesrc', 
+  rcharts.cdn = TRUE,
+  RCHART_WIDTH = 700,
+  RCHART_HEIGHT = 400
+)
+knitr::opts_chunk$set(tidy = F, cache=FALSE, results = 'asis', comment = NA, message = T)
+
+```
+
+#### Data Example
+
+``` {r, chart1, echo = F, warning=FALSE}
+
+# Data preprocessing
+
+url <- "https://raw.githubusercontent.com/medlina/Malkos/master/hub82.txt"
+myData <- getURL(url, ssl.verifypeer = FALSE)
+example0 <- read.table(textConnection(myData), header=TRUE, quote="\"") 
+example0_ordered <- example0[order(as.Date(example0$dt, format="%Y-%m-%d")),]
+example0_ordered$dt_nbr <- as.matrix(c(1:nrow(example0)))
+example0_ordered$mbps_out_sum_max[181] <- 2.613879e+14
+example0_ordered$mbps_out_sum_max <- example0_ordered$mbps_out_sum_max/(1e+14)
+example0_ordered$dt <- as.Date(example0_ordered$dt, format = "%Y-%m-%d")
+
+passPlot = nPlot(mbps_out_sum_max ~ dt, data = example0_ordered, type = 'lineWithFocusChart')
+passPlot$yAxis( axisLabel = "Data Points", width = 40 )
+passPlot$xAxis(tickFormat="#!function(d) {return d3.time.format.utc('%Y-%m-%d')(new Date(d * 24 * 60 * 60 * 1000));}!#" )
+passPlot$print("chart1", include_assets=TRUE, cdn=TRUE)
+```
+
+#### Estimation of Missing Data with Mean Value
+
+``` {r, echo = F, warning=FALSE}
+
+if (!is.na(example0_ordered$mbps_out_sum_max)) {
+  print("There are no Missing Data")
+}
+
+example0_ordered$mbps_out_sum_max[example0_ordered$mbps_out_sum_max == 0] <- NA
+result <- shapiro.test(example0_ordered$mbps_out_sum_max)
+
+if (result$p.value < 0.05 && is.na(example0_ordered$mbps_out_sum_max)) {
+  print("Data are Normaly Distributed")
+  print(result)
+  
+  # Distribution Plot
+  
+  x <- example0_ordered$mbps_out_sum_max 
+  h <- hist(x, breaks=30, col="red", xlab = "mbps_out_sum_max", 
+    main = "Histogram with Normal Curve") 
+  xfit<-seq(min(x),max(x),length=40) 
+  yfit<-dnorm(xfit,mean=mean(x),sd=sd(x)) 
+  yfit <- yfit*diff(h$mids[1:2])*length(x) 
+  lines(xfit, yfit, col="blue", lwd=2)
+  
+  # Missing Values Estimation
+  
+  example0_ordered$mbps_out_sum_max[example0_ordered$mbps_out_sum_max == NA] <- mean(example0_ordered$mbps_out_sum_max)
+  
+  # Data Plot with Estimated Missing Values
+  
+  passPlot = nPlot(mbps_out_sum_max ~ dt, data = example0_ordered, type = 'lineWithFocusChart')
+  passPlot$xAxis(tickFormat="#!function(d) {return d3.time.format.utc('%Y-%m-%d')(new Date(d * 24 * 60 * 60 * 1000));}!#" )
+  passPlot$print("chart2", include_assets=TRUE, cdn=TRUE)
+  } else {if (result$p.value >= 0.05 && is.na(example0_ordered$mbps_out_sum_max)){
+          print("Data are not Normaly Distributed")
+          print(result)
+          }
+  }
+
+```
+
+#### Estimation of Missing Data with Linear Interpolation
+
+``` {r, echo = F, warning=FALSE}
+
+if (!is.na(example0_ordered$mbps_out_sum_max)) {
+  print("There are no Missing Data")
+}
+
+if (result$p.value >= 0.05 && is.na(example0_ordered$mbps_out_sum_max)){
+  
+  # Linear Interpolation of Missing Data
+  
+  for (i in 2:nrow(example0)) {
+    if (is.na(example0_ordered$mbps_out_sum_max[i])){
+      for (k in i:nrow(example0)){
+        if (!is.na(example0_ordered$mbps_out_sum_max[k])){
+        index1 <- k
+        }
+      }
+      example0_ordered$mbps_out_sum_max[i] <- example0_ordered$mbps_out_sum_max[i-1] + (example0_ordered$mbps_out_sum_max[index1] - example0_ordered$mbps_out_sum_max[i-1]) * (example0_ordered$dt_nbr[i] - example0_ordered$dt_nbr[i -1]) / (example0_ordered$dt_nbr[index1] - example0_ordered$dt_nbr[i - 1])
+   }
+  } 
+
+  # Data Plot with Estimated Missing Values
+  
+  passPlot = nPlot(mbps_out_sum_max ~ dt, data = example0_ordered, type = 'lineWithFocusChart')
+  passPlot$xAxis(tickFormat="#!function(d) {return d3.time.format.utc('%Y-%m-%d')(new Date(d * 24 * 60 * 60 * 1000));}!#" )
+  passPlot$print("chart2", include_assets=TRUE, cdn=TRUE)
+ } else { if (result$p.value >= 0.05 && is.na(example0_ordered$mbps_out_sum_ma)){
+   print("Missing Data are already interpolated")}
+ }
+
+```
+
+#### AutoFitting Linear Model
+
+``` {r, echo = F, warning=FALSE, message=FALSE}
+
+model1 <- lm(example0_ordered$mbps_out_sum_max ~ example0_ordered$dt_nbr)
+model2 <- model1
+print(model2)
+
+# Plotting Data with fitted Linear Model
+
+plot(example0_ordered$mbps_out_sum_max ~ example0_ordered$dt_nbr, ylab='mbps_out_sum_max',xlab='date',type='o', col = "blue")
+abline(model1, col = "red")
+
+```
+
+#### Manual Fitting Linear Model
+
+``` {r, echo = F, warning=FALSE}
+
+X_1 <- as.matrix(example0_ordered$dt_nbr)
+ones <- as.matrix(rep(1,nrow(example0)))
+x <- cbind(ones, X_1)
+y <- as.matrix(example0_ordered$mbps_out_sum_max)
+m <- nrow(example0)
+
+# Matrix form
+
+Beta <- solve(t(x) %*% x) %*% t(x) %*% y
+print("Estimated Coeficients are")
+print(Beta)
+
+# Plotting Data with fitted Linear Model
+
+plot(example0_ordered$mbps_out_sum_max ~ example0_ordered$dt_nbr, ylab='mbps_out_sum_max',xlab='date',type='o', col = "blue")
+abline(Beta[1], Beta[2], col = "red")
+
+```
+
+#### Linear Regression with Gradient Descent
+
+``` {r, echo = F, warning=FALSE}
+
+iterations <- 500000
+theta <- as.matrix(c(0,0))
+theta1 <- as.matrix(c(0,0))
+alpha <- 0.0001
+
+for (i in 1:iterations){
+    
+  theta1[1] <- theta[1] + alpha * (1/m) * sum((y - theta[1] - theta[2] * X_1)) 
+  theta1[2] <- theta[2] + alpha * (1/m) * sum((y -  theta[1] - theta[2] * X_1) * X_1)
+  theta <- theta1
+}
+
+print("Estimated Coeficients are")
+print(theta)
+
+# Plotting Data with fitted Linear Model
+
+plot(example0_ordered$mbps_out_sum_max ~ example0_ordered$dt_nbr, ylab='mbps_out_sum_max',xlab='date',type='o', col = "blue")
+abline(theta[1], theta[2], col = "red")
+
+```
+
+#### Decomposing Non-Seasonal Data
+
+A non-seasonal time series consists of a trend component and an irregular component. Decomposing the time series involves trying to separate the time series into these components, that is, estimating the the trend component and the irregular component.
+
+To estimate the trend component of a non-seasonal time series that can be described using an additive model, it is common to use a smoothing method, such as calculating the simple moving average of the time series.
+
+appears is non-seasonal, and can probably be described using an additive model, since the random fluctuations in the data are roughly constant in size over time
+
+``` {r, echo = F, warning=FALSE}
+
+example_ts <- ts(example0_ordered$mbps_out_sum_max, frequency = 365, start=c(2014,1,1))
+example_SMA <- SMA(example_ts, n = 10)
+plot.ts(example_SMA)
+# example_decompose <- decompose(example_ts) - Error: time series has no or less than 2 periods
+
+```
+
+The data smoothed with a simple moving average of order 8 gives a clearer picture of the trend component, and we can see that the age of death of the English kings seems to have decreased from about 55 years old to about 38 years old during the reign of the first 20 kings, and then increased after that to about 73 years old by the end of the reign of the 40th king in the time series.
+
+#### Forecasts using Exponential Smoothing
+
+Exponential smoothing can be used to make short-term forecasts for time series data. You can see from the plot that there is roughly constant level (the mean stays constant at about 25 inches). The random fluctuations in the time series seem to be roughly constant in size over time, so it is probably appropriate to describe the data using an additive model. Thus, we can make forecasts using simple exponential smoothing.The output of HoltWinters() tells us that the estimated value of the alpha parameter is about 0.024. This is very close to zero, telling us that the forecasts are based on both recent and less recent observations (although somewhat more weight is placed on recent observations).
+
+By default, HoltWinters() just makes forecasts for the same time period covered by our original time series. In this case, our original time series included rainfall for London from 1813-1912, so the forecasts are also for 1813-1912.
+
+``` {r, echo = F, warning=FALSE}
+
+example_forecasts <- HoltWinters(example_ts, beta=FALSE, gamma=FALSE)
+example_forecasts
+plot(example_forecasts)
+
+```
+
+The plot shows the original time series in black, and the forecasts as a red line. The time series of forecasts is much smoother than the time series of the original data here.
+
+As a measure of the accuracy of the forecasts, we can calculate the sum of squared errors for the in-sample forecast errors, that is, the forecast errors for the time period covered by our original time series.
+
+``` {r, echo = F, warning=FALSE}
+
+example_forecasts$SSE
+example_forecasts2 <- forecast.HoltWinters(example_forecasts, h=8)
+plot.forecast(example_forecasts2)
+
+```
+
+The 'forecast errors' are calculated as the observed values minus predicted values, for each time point. We can only calculate the forecast errors for the time period covered by our original time series, which is 1813-1912 for the rainfall data. As mentioned above, one measure of the accuracy of the predictive model is the sum-of-squared-errors (SSE) for the in-sample forecast errors.
+
+The in-sample forecast errors are stored in the named element "residuals" of the list variable returned by forecast.HoltWinters(). If the predictive model cannot be improved upon, there should be no correlations between forecast errors for successive predictions. In other words, if there are correlations between forecast errors for successive predictions, it is likely that the simple exponential smoothing forecasts could be improved upon by another forecasting technique.
+
+To figure out whether this is the case, we can obtain a correlogram of the in-sample forecast errors for lags 1-20. We can calculate a correlogram of the forecast errors using the "acf()" function in R. To specify the maximum lag that we want to look at, we use the "lag.max" parameter in acf().
+
+``` {r, echo = F, warning=FALSE}
+
+acf(example_forecasts2$residuals, lag.max=20)
+
+```
