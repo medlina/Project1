@@ -43,40 +43,44 @@ knitr::opts_chunk$set(tidy = F, cache=FALSE, results = 'asis', comment = NA, mes
 
 # Data preprocessing
 
-url <- "https://raw.githubusercontent.com/medlina/Malkos/master/hub82.txt"
+url <- "https://raw.githubusercontent.com/medlina/Project1/master/data1.txt"
 myData <- getURL(url, ssl.verifypeer = FALSE)
-example0 <- read.table(textConnection(myData), header=TRUE, quote="\"") 
-example0_ordered <- example0[order(as.Date(example0$dt, format="%Y-%m-%d")),]
-example0_ordered$dt_nbr <- as.matrix(c(1:nrow(example0)))
-example0_ordered$mbps_out_sum_max[181] <- 2.613879e+14
-example0_ordered$mbps_out_sum_max <- example0_ordered$mbps_out_sum_max/(1e+14)
-example0_ordered$dt <- as.Date(example0_ordered$dt, format = "%Y-%m-%d")
+example0_ordered <- read.table(textConnection(myData), header=TRUE, quote="\"") 
+#example0 <- read.table("~/Olena/hub82.txt", header=TRUE, quote="\"")
+#example0_ordered <- example0[order(as.Date(example0$dt, format="%Y-%m-%d")),]
+#example0_ordered$day <- as.matrix(c(1:nrow(example0)))
+#example0_ordered$usage[181] <- 2.613879e+14
+#example0_ordered$usage <- example0_ordered$usage/(1e+14)
+example0_ordered$date <- as.Date(example0_ordered$date, format = "%Y-%m-%d")
 
-passPlot = nPlot(mbps_out_sum_max ~ dt, data = example0_ordered, type = 'lineWithFocusChart')
-passPlot$yAxis( axisLabel = "Data Points", width = 40 )
+
+passPlot = nPlot(usage ~ date, data = example0_ordered, type = 'lineWithFocusChart')
+passPlot$yAxis(axisLabel = "Usage", width = 40 )
 passPlot$xAxis(tickFormat="#!function(d) {return d3.time.format.utc('%Y-%m-%d')(new Date(d * 24 * 60 * 60 * 1000));}!#" )
 passPlot$print("chart1", include_assets=TRUE, cdn=TRUE)
 ```
+
+We can see from teh plot that this time series could probably be described using an additive model, since the random fluctuations in the data are roughly constant in size over time.
 
 #### Estimation of Missing Data with Mean Value
 
 ``` {r, echo = F, warning=FALSE}
 
-if (!is.na(example0_ordered$mbps_out_sum_max)) {
-  print("There are no Missing Data")
+if (!is.na(example0_ordered$usage)) {
+  print("There are no Missing Data in this Data Set")
 }
 
-example0_ordered$mbps_out_sum_max[example0_ordered$mbps_out_sum_max == 0] <- NA
-result <- shapiro.test(example0_ordered$mbps_out_sum_max)
+example0_ordered$usage[example0_ordered$usage == 0] <- NA
+result <- shapiro.test(example0_ordered$usage)
 
-if (result$p.value < 0.05 && is.na(example0_ordered$mbps_out_sum_max)) {
+if (result$p.value < 0.05 && is.na(example0_ordered$usage)) {
   print("Data are Normaly Distributed")
   print(result)
   
   # Distribution Plot
   
-  x <- example0_ordered$mbps_out_sum_max 
-  h <- hist(x, breaks=30, col="red", xlab = "mbps_out_sum_max", 
+  x <- example0_ordered$usage 
+  h <- hist(x, breaks=30, col="red", xlab = "usage", 
     main = "Histogram with Normal Curve") 
   xfit<-seq(min(x),max(x),length=40) 
   yfit<-dnorm(xfit,mean=mean(x),sd=sd(x)) 
@@ -85,14 +89,14 @@ if (result$p.value < 0.05 && is.na(example0_ordered$mbps_out_sum_max)) {
   
   # Missing Values Estimation
   
-  example0_ordered$mbps_out_sum_max[example0_ordered$mbps_out_sum_max == NA] <- mean(example0_ordered$mbps_out_sum_max)
+  example0_ordered$usage[example0_ordered$usage == NA] <- mean(example0_ordered$usage)
   
   # Data Plot with Estimated Missing Values
   
-  passPlot = nPlot(mbps_out_sum_max ~ dt, data = example0_ordered, type = 'lineWithFocusChart')
+  passPlot = nPlot(usage ~ dt, data = example0_ordered, type = 'lineWithFocusChart')
   passPlot$xAxis(tickFormat="#!function(d) {return d3.time.format.utc('%Y-%m-%d')(new Date(d * 24 * 60 * 60 * 1000));}!#" )
   passPlot$print("chart2", include_assets=TRUE, cdn=TRUE)
-  } else {if (result$p.value >= 0.05 && is.na(example0_ordered$mbps_out_sum_max)){
+  } else {if (result$p.value >= 0.05 && is.na(example0_ordered$usage)){
           print("Data are not Normaly Distributed")
           print(result)
           }
@@ -104,28 +108,28 @@ if (result$p.value < 0.05 && is.na(example0_ordered$mbps_out_sum_max)) {
 
 ``` {r, echo = F, warning=FALSE}
 
-if (!is.na(example0_ordered$mbps_out_sum_max)) {
-  print("There are no Missing Data")
+if (!is.na(example0_ordered$usage)) {
+  print("There are no Missing Data in this Data Set")
 }
 
-if (result$p.value >= 0.05 && is.na(example0_ordered$mbps_out_sum_max)){
+if (result$p.value >= 0.05 && is.na(example0_ordered$usage)){
   
   # Linear Interpolation of Missing Data
   
   for (i in 2:nrow(example0)) {
-    if (is.na(example0_ordered$mbps_out_sum_max[i])){
-      for (k in i:nrow(example0)){
-        if (!is.na(example0_ordered$mbps_out_sum_max[k])){
+    if (is.na(example0_ordered$usage[i])){
+      for (k in i:nrow(example0_ordered)){
+        if (!is.na(example0_ordered$usage[k])){
         index1 <- k
         }
       }
-      example0_ordered$mbps_out_sum_max[i] <- example0_ordered$mbps_out_sum_max[i-1] + (example0_ordered$mbps_out_sum_max[index1] - example0_ordered$mbps_out_sum_max[i-1]) * (example0_ordered$dt_nbr[i] - example0_ordered$dt_nbr[i -1]) / (example0_ordered$dt_nbr[index1] - example0_ordered$dt_nbr[i - 1])
+      example0_ordered$usage[i] <- example0_ordered$usage[i-1] + (example0_ordered$usage[index1] - example0_ordered$usage[i-1]) * (example0_ordered$day[i] - example0_ordered$day[i -1]) / (example0_ordered$day[index1] - example0_ordered$day[i - 1])
    }
   } 
 
   # Data Plot with Estimated Missing Values
   
-  passPlot = nPlot(mbps_out_sum_max ~ dt, data = example0_ordered, type = 'lineWithFocusChart')
+  passPlot = nPlot(usage ~ dt, data = example0_ordered, type = 'lineWithFocusChart')
   passPlot$xAxis(tickFormat="#!function(d) {return d3.time.format.utc('%Y-%m-%d')(new Date(d * 24 * 60 * 60 * 1000));}!#" )
   passPlot$print("chart2", include_assets=TRUE, cdn=TRUE)
  } else { if (result$p.value >= 0.05 && is.na(example0_ordered$mbps_out_sum_ma)){
@@ -134,29 +138,78 @@ if (result$p.value >= 0.05 && is.na(example0_ordered$mbps_out_sum_max)){
 
 ```
 
+#### Decomposing Time Series
+
+``` {r, echo = F, warning=FALSE}
+
+# example_decompose <- decompose(example_ts) - Error: time series has no or less than 2 periods
+
+```
+
+Decomposing a tiem series is needed to separate into constituent components. Fron the plot above, we can assume that our data consists of a trend component and an irregular component (without seasonal component).However, it is better to test for seasonality on annual data. Thus, let's try  to start with an fitting a Linear Model to our Data.
+
 #### AutoFitting Linear Model
 
 ``` {r, echo = F, warning=FALSE, message=FALSE}
 
-model1 <- lm(example0_ordered$mbps_out_sum_max ~ example0_ordered$dt_nbr)
-model2 <- model1
-print(model2)
+model1 <- lm(example0_ordered$usage ~ example0_ordered$day)
 
 # Plotting Data with fitted Linear Model
 
-plot(example0_ordered$mbps_out_sum_max ~ example0_ordered$dt_nbr, ylab='mbps_out_sum_max',xlab='date',type='o', col = "blue")
+# predicts + interval
+new_day <- seq(min(example0_ordered$day), max(example0_ordered$day), length.out = 182)
+pred_lm <- predict(model1, newdata = data.frame(day = new_day), interval = 'confidence')
+
+# plot
+plot(example0_ordered$usage ~ example0_ordered$day, ylab='usage',xlab='date',type='o', col = "blue")
+# add fill
+# set alpha = 80 so it's relatively transparent
+color <- rgb(190, 190, 190, alpha = 80, maxColorValue=255)
+polygon(c(rev(new_day), new_day), c(rev(pred_lm[ ,3]), pred_lm[ ,2]), col = color, border = NA)
+# model
 abline(model1, col = "red")
+
+# intervals
+lines(new_day, pred_lm[ ,3], lty = 'dashed', col = 'red')
+lines(new_day, pred_lm[ ,2], lty = 'dashed', col = 'red')
+
+confint(model1)
 
 ```
 
-#### Manual Fitting Linear Model
+From this output, we have determined that the intercept is  2.59 and the coefficient is 0.0001571. Therefore, the complete regression equation is Usage = 2.59 + 0.0001571 * Time. This equation tells us that the predicted usage almost will not increase with time. Suppose that our research question asks what the expected usage is. As follows, we can use the regression equation to calculate the answer to this question.
+
+Let's check model summary
+
+``` {r, echo = F, warning=FALSE, message=FALSE}
+
+summary(model1)
+
+```
+
+We can conclude that 0% R-squared indicates that the model explains none of the variability of the response data around its mean.
+
+After fitting a regression model, we should consider various diagnostic
+plots. In the case of time series regression, an important diagnostic plot is the
+correlogram of the residuals:
+
+``` {r, echo = F, warning=FALSE, message=FALSE}
+
+par(mfrow=c(1,2))
+plot(residuals(model1))
+acf(residuals(model1), lag.max = 20, main = "ACF of residuals")
+
+```
+We can see that there is an autocorrelation left in the residuals (seen in the significant spike in the ACF plot). This suggests that the model can be improved. We will come back to improving later. At first, we will fit linear models that are calculated manualy. 
+
+#### Manual Fitting Linear Model in Matrix Form
 
 ``` {r, echo = F, warning=FALSE}
 
-X_1 <- as.matrix(example0_ordered$dt_nbr)
+X_1 <- as.matrix(example0_ordered$day)
 ones <- as.matrix(rep(1,nrow(example0)))
 x <- cbind(ones, X_1)
-y <- as.matrix(example0_ordered$mbps_out_sum_max)
+y <- as.matrix(example0_ordered$usage)
 m <- nrow(example0)
 
 # Matrix form
@@ -167,8 +220,8 @@ print(Beta)
 
 # Plotting Data with fitted Linear Model
 
-plot(example0_ordered$mbps_out_sum_max ~ example0_ordered$dt_nbr, ylab='mbps_out_sum_max',xlab='date',type='o', col = "blue")
-abline(Beta[1], Beta[2], col = "red")
+plot(example0_ordered$usage ~ example0_ordered$day, ylab='usage',xlab='date',type='o', col = "blue")
+abline(Beta[1], Beta[2], col = "green")
 
 ```
 
@@ -193,35 +246,33 @@ print(theta)
 
 # Plotting Data with fitted Linear Model
 
-plot(example0_ordered$mbps_out_sum_max ~ example0_ordered$dt_nbr, ylab='mbps_out_sum_max',xlab='date',type='o', col = "blue")
+plot(example0_ordered$usage ~ example0_ordered$day, ylab='usage',xlab='date',type='o', col = "blue")
 abline(theta[1], theta[2], col = "red")
 
 ```
 
+We can see that both manually built models are almost the same as fitted using R command. 
+
 #### Decomposing Non-Seasonal Data
 
-A non-seasonal time series consists of a trend component and an irregular component. Decomposing the time series involves trying to separate the time series into these components, that is, estimating the the trend component and the irregular component.
-
-To estimate the trend component of a non-seasonal time series that can be described using an additive model, it is common to use a smoothing method, such as calculating the simple moving average of the time series.
-
-appears is non-seasonal, and can probably be described using an additive model, since the random fluctuations in the data are roughly constant in size over time
+Now, let's try to fit the data better with other models.
 
 ``` {r, echo = F, warning=FALSE}
+#To estimate the trend component of a non-seasonal time series that can be described using an additive model, it is common to use a smoothing method, such as calculating the simple moving average of teh tiem series.
 
-example_ts <- ts(example0_ordered$mbps_out_sum_max, frequency = 365, start=c(2014,1,1))
-example_SMA <- SMA(example_ts, n = 10)
-plot.ts(example_SMA)
-# example_decompose <- decompose(example_ts) - Error: time series has no or less than 2 periods
+
+
+example_ts <- ts(example0_ordered$usage, frequency = 365, start=c(2014,1,1))
+#example_SMA <- SMA(example_ts, n = 20)
+#plot.ts(example_SMA)
+
+#The data smoothed with a simple moving average of order 20 gives a clearer picture of the trend component, and we can see that the usage seems to increase for first fifty days, then deacrease for the next fifty days, and then increased again after that.Even thought the plot show us seasonal-like behaviour, decomposing this det of data is not possible. Probably, we need more data to judge.
 
 ```
 
-The data smoothed with a simple moving average of order 8 gives a clearer picture of the trend component, and we can see that the age of death of the English kings seems to have decreased from about 55 years old to about 38 years old during the reign of the first 20 kings, and then increased after that to about 73 years old by the end of the reign of the 40th king in the time series.
-
 #### Forecasts using Exponential Smoothing
 
-Exponential smoothing can be used to make short-term forecasts for time series data. You can see from the plot that there is roughly constant level (the mean stays constant at about 25 inches). The random fluctuations in the time series seem to be roughly constant in size over time, so it is probably appropriate to describe the data using an additive model. Thus, we can make forecasts using simple exponential smoothing.The output of HoltWinters() tells us that the estimated value of the alpha parameter is about 0.024. This is very close to zero, telling us that the forecasts are based on both recent and less recent observations (although somewhat more weight is placed on recent observations).
-
-By default, HoltWinters() just makes forecasts for the same time period covered by our original time series. In this case, our original time series included rainfall for London from 1813-1912, so the forecasts are also for 1813-1912.
+Exponential smoothing can be used to make short-term forecasts for time series data. You can see from the plot that there is roughly constant level (the mean stays constant at about 2.6). Thus, we can make forecasts using simple exponential smoothing.
 
 ``` {r, echo = F, warning=FALSE}
 
@@ -233,24 +284,152 @@ plot(example_forecasts)
 
 The plot shows the original time series in black, and the forecasts as a red line. The time series of forecasts is much smoother than the time series of the original data here.
 
-As a measure of the accuracy of the forecasts, we can calculate the sum of squared errors for the in-sample forecast errors, that is, the forecast errors for the time period covered by our original time series.
+The output of HoltWinters() tells us that the estimated value of the alpha parameter is about 0.17. It means that older data points are weighted more heavily. 
 
 ``` {r, echo = F, warning=FALSE}
 
-example_forecasts$SSE
-example_forecasts2 <- forecast.HoltWinters(example_forecasts, h=8)
+#example_forecasts$SSE
+example_forecasts2 <- forecast.HoltWinters(example_forecasts, h = 20)
 plot.forecast(example_forecasts2)
 
 ```
 
-The 'forecast errors' are calculated as the observed values minus predicted values, for each time point. We can only calculate the forecast errors for the time period covered by our original time series, which is 1813-1912 for the rainfall data. As mentioned above, one measure of the accuracy of the predictive model is the sum-of-squared-errors (SSE) for the in-sample forecast errors.
+On this plot you can see prediction for upcoming 20 days with 80% and 95% prediction intervals.
 
-The in-sample forecast errors are stored in the named element "residuals" of the list variable returned by forecast.HoltWinters(). If the predictive model cannot be improved upon, there should be no correlations between forecast errors for successive predictions. In other words, if there are correlations between forecast errors for successive predictions, it is likely that the simple exponential smoothing forecasts could be improved upon by another forecasting technique.
 
-To figure out whether this is the case, we can obtain a correlogram of the in-sample forecast errors for lags 1-20. We can calculate a correlogram of the forecast errors using the "acf()" function in R. To specify the maximum lag that we want to look at, we use the "lag.max" parameter in acf().
+If the predictive model cannot be improved upon, there should be no correlations between forecast errors for successive predictions. In other words, if there are correlations between forecast errors for successive predictions, it is likely that the simple exponential smoothing forecasts could be improved upon by another forecasting technique.
+
+To figure out whether this is the case, we can obtain a correlogram of the in-sample forecast errors for lags 1-20. 
 
 ``` {r, echo = F, warning=FALSE}
 
 acf(example_forecasts2$residuals, lag.max=20)
 
 ```
+
+You can see from the sample correlogram that the autocorrelation at lag 1, 11 and 17 are just touching the significance bounds. To test whether there is significant evidence for non-zero correlations at lags 1-20, we can carry out a Ljung-Box test.
+
+``` {r, echo = F, warning=FALSE}
+
+test <- Box.test(example_forecasts2$residuals, lag  = 20, type="Ljung-Box")
+print(test)
+
+```
+
+Here the Ljung-Box test statistic is 24.89, and the p-value is 0.2, so there is  evidence of non-zero autocorrelations in the in-sample forecast errors at lags 1-20.
+
+Thus, this one predictive model can also be improved upon. 
+
+``` {r, echo = F, warning=FALSE}
+
+plotForecastErrors <- function(forecasterrors)
+  {
+     # make a histogram of the forecast errors:
+     mybinsize <- IQR(forecasterrors)/4
+     mysd   <- sd(forecasterrors)
+     mymin  <- min(forecasterrors) - mysd*5
+     mymax  <- max(forecasterrors) + mysd*3
+     # generate normally distributed data with mean 0 and standard deviation mysd
+     mynorm <- rnorm(10000, mean=0, sd=mysd)
+     mymin2 <- min(mynorm)
+     mymax2 <- max(mynorm)
+     if (mymin2 < mymin) { mymin <- mymin2 }
+     if (mymax2 > mymax) { mymax <- mymax2 }
+     # make a red histogram of the forecast errors, with the normally distributed data overlaid:
+     mybins <- seq(mymin, mymax, mybinsize)
+     hist(forecasterrors, col="red", freq=FALSE, breaks=mybins)
+     # freq=FALSE ensures the area under the histogram = 1
+     # generate normally distributed data with mean 0 and standard deviation mysd
+     myhist <- hist(mynorm, plot=FALSE, breaks=mybins)
+     # plot the normal curve as a blue line on top of the histogram of forecast errors:
+     points(myhist$mids, myhist$density, type="l", col="blue", lwd=2)
+  }
+
+#plotForecastErrors(example_forecasts2$residuals)
+#plotForecastErrors(residuals(model1))
+
+```
+
+#### ARIMA
+
+While exponential smoothing methods do not make any assumptions about correlations between successive values of the time series, ARIMA models include an explicit statistical model for the irregular component of a time series, that allows for non-zero utocorrelations in the irregular component.
+
+#### Differencing a Time Series
+
+Iff we start off with a non-stationary tiem series, first we need to difference the time series until we obtain a stationary time series.In our case the tiem series is stationary
+
+``` {r, echo = F, warning=FALSE}
+
+#examplediff1 <- diff(example_ts, differences=1)
+#plot.ts(examplediff1)
+
+```
+
+When our time series is stationary, the next step is to select the appropriate ARIMA model, which means finding the values of most appropriate values of p and q for an ARIMA(p,d,q) model. To do this, we need to examine the correlogram and partial correlogram of the stationary time series.
+
+``` {r, echo = F, warning=FALSE}
+
+acf(example_ts, lag.max=20)             
+acf(example_ts, lag.max=20, plot=FALSE)
+
+pacf(example_ts, lag.max=20)             
+pacf(example_ts, lag.max=20, plot=FALSE) 
+
+```
+
+Since the correlogram tends to zero after lag 2, and the partial correlogram correlations at lag 1 and 11, this means that the following ARMA (autoregressive moving average) models are possible for the time series:
+
+- an ARMA(2,0) model, that is, an autoregressive model of order p = 2
+
+- an ARMA(0,3) model, that is, a moving average model of order q = 2, since the autocorrelogram is zero after lag 2
+
+- an ARMA(p,q) model, that is, a mixed model with p and q greater than 0, since the autocorrelogram and partial correlogram tail off to zero (although the correlogram probably tails off to zero too abruptly for this model to be appropriate)
+
+We use the principle of parsimony to decide which model is best: that is, we assume that the model with the fewest parameters is best. Thus, let's take the ARMA(2,0) model.
+
+An ARIMA(2,0,0) model is an autoregressive model of order 2, or AR(2) model. 
+
+#### Autofitting ARIMA models
+
+``` {r, echo = F, warning=FALSE}
+
+auto.arima(example_ts)
+examplearima <- arima(example_ts, order=c(2,0,0)) 
+examplearima
+
+```
+
+As a result we are proposed to use ARIMA(3,0,0) model.But let's fix to our chosen model ARIMA(2,0,0)
+
+#### ARIMA forecast
+
+``` {r, echo = F, warning=FALSE}
+
+examplearima_forecast <- forecast.Arima(examplearima, h=20)
+plot.forecast(examplearima_forecast)
+
+```
+
+We obtained forecast for the next 20 days usage with 80% and 95% prediction intervals.
+
+Now it's a good idea to investigate whether the forrecast errors of an ARIMA model are normally distributed with mean zero and constant variance, and whether there are correlations between successive forecast errors.
+
+#### ARIMA MODEL VALIDATION
+
+``` {r, echo = F, warning=FALSE}
+
+acf(examplearima_forecast$residuals, lag.max=20)
+Box.test(examplearima_forecast$residuals, lag=20, type="Ljung-Box")
+plot.ts(examplearima_forecast$residuals)            
+
+```
+
+Since the correlogram shows only one exceding the significance bounds (which could happen due to chance), and p-value for the Ljung-Box test is 0.67, we can conclude that there is small evidence for non-zero autocorrelations in the forecast errors at lags 1-20.
+
+``` {r, echo = F, warning=FALSE}
+
+plotForecastErrors(examplearima_forecast$residuals)
+
+```
+
+Since succesive forecast errors do not seem to be correlated, and teh forecast errors seem to be normaly distributed with mean zero and constant variance, the ARIMA(2,0,0) (or AR(2)) does seem to provide an adequate predictive model.
