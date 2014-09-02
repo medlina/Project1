@@ -173,6 +173,11 @@ abline(model1, col = "red")
 lines(new_day, pred_lm[ ,3], lty = 'dashed', col = 'red')
 lines(new_day, pred_lm[ ,2], lty = 'dashed', col = 'red')
 
+```
+
+``` {r, echo = F, warning=FALSE, message=FALSE}
+
+print("Confidence intervals are")
 confint(model1)
 
 ```
@@ -278,8 +283,9 @@ Exponential smoothing can be used to make short-term forecasts for time series d
 ``` {r, echo = F, warning=FALSE}
 
 example_forecasts <- HoltWinters(example_ts, beta=FALSE, gamma=FALSE)
-example_forecasts
 plot(example_forecasts)
+print(" ")
+example_forecasts
 
 ```
 
@@ -353,11 +359,11 @@ plotForecastErrors <- function(forecasterrors)
 
 #### ARIMA
 
-While exponential smoothing methods do not make any assumptions about correlations between successive values of the time series, ARIMA models include an explicit statistical model for the irregular component of a time series, that allows for non-zero utocorrelations in the irregular component.
+While exponential smoothing methods do not make any assumptions about correlations between successive values of the time series, ARIMA models include an explicit statistical model for the irregular component of a time series, that allows non-zero autocorrelations in the irregular component.
 
 #### Differencing a Time Series
 
-Iff we start off with a non-stationary tiem series, first we need to difference the time series until we obtain a stationary time series.In our case the tiem series is stationary
+If we start off with a non-stationary time series, first we need to difference the time series until we obtain a stationary time series. In our case the time series is stationary.
 
 ``` {r, echo = F, warning=FALSE}
 
@@ -370,19 +376,20 @@ When our time series is stationary, the next step is to select the appropriate A
 
 ``` {r, echo = F, warning=FALSE}
 
-acf(example_ts, lag.max=20)             
-acf(example_ts, lag.max=20, plot=FALSE)
+par(mfrow = c(1, 2))
+acf(example_ts, lag.max=20)  
+pacf(example_ts, lag.max=20)
 
-pacf(example_ts, lag.max=20)             
-pacf(example_ts, lag.max=20, plot=FALSE) 
+#acf(example_ts, lag.max=20, plot=FALSE)
+#pacf(example_ts, lag.max=20, plot=FALSE) 
 
 ```
 
-Since the correlogram tends to zero after lag 2, and the partial correlogram correlations at lag 1 and 11, this means that the following ARMA (autoregressive moving average) models are possible for the time series:
+Since the correlogram tends to zero after lag 2, and the partial correlogram shows correlations at lag 1 and 11, this the following ARMA (autoregressive moving average) models are possible for the time series:
 
 - an ARMA(2,0) model, that is, an autoregressive model of order p = 2
 
-- an ARMA(0,3) model, that is, a moving average model of order q = 2, since the autocorrelogram is zero after lag 2
+- an ARMA(0,2) model, that is, a moving average model of order q = 2, since the autocorrelogram is zero after lag 2
 
 - an ARMA(p,q) model, that is, a mixed model with p and q greater than 0, since the autocorrelogram and partial correlogram tail off to zero (although the correlogram probably tails off to zero too abruptly for this model to be appropriate)
 
@@ -396,11 +403,11 @@ An ARIMA(2,0,0) model is an autoregressive model of order 2, or AR(2) model.
 
 auto.arima(example_ts)
 examplearima <- arima(example_ts, order=c(2,0,0)) 
-examplearima
+#examplearima
 
 ```
 
-As a result we are proposed to use ARIMA(3,0,0) model.But let's fix to our chosen model ARIMA(2,0,0)
+As a result we are proposed to use ARIMA(3,0,0) model.But let's fix to our chosen model ARIMA(2,0,0).
 
 #### ARIMA forecast
 
@@ -419,13 +426,15 @@ Now it's a good idea to investigate whether the forrecast errors of an ARIMA mod
 
 ``` {r, echo = F, warning=FALSE}
 
+par(mfrow = c(1, 2))
 acf(examplearima_forecast$residuals, lag.max=20)
+plot.ts(examplearima_forecast$residuals)  
+
 Box.test(examplearima_forecast$residuals, lag=20, type="Ljung-Box")
-plot.ts(examplearima_forecast$residuals)            
 
 ```
 
-Since the correlogram shows only one exceding the significance bounds (which could happen due to chance), and p-value for the Ljung-Box test is 0.67, we can conclude that there is small evidence for non-zero autocorrelations in the forecast errors at lags 1-20.
+Since the correlogram shows only one exceding the significance bounds (which could happen due to chance), and p-value for the Ljung-Box test is 0.67, we can conclude that there is just small evidence for non-zero autocorrelations in the forecast errors at lags 1-20.
 
 ``` {r, echo = F, warning=FALSE}
 
@@ -433,9 +442,9 @@ plotForecastErrors(examplearima_forecast$residuals)
 
 ```
 
-Since succesive forecast errors do not seem to be correlated, and teh forecast errors seem to be normaly distributed with mean zero and constant variance, the ARIMA(2,0,0) (or AR(2)) does seem to provide an adequate predictive model.
+Since succesive forecast errors do not seem to be correlated, and the forecast errors seem to be normaly distributed with mean zero and constant variance, the ARIMA(2,0,0) (or AR(2)) does seem to provide an adequate predictive model.
 
-For the last step let's compare results of our Linear and ARIMA models. For that we devided our Data Set into two parts - a training one (75% of all data points), and a test one (25% of all data points).
+For the last step let's compare results of our Linear and ARIMA models. For that we devided our Data Set into two parts - a training one (75% of all data points), and a test one (25% of all data points). After that we compare predictions that are built and real values from the testing set.
 
 ``` {r, echo = F, warning=FALSE}
 
@@ -449,7 +458,6 @@ model2_forecast <- predict(model2, interval = 'confidence')
 model3 <- arima(training_ts, order=c(2,0,0)) 
 model3_forecast <- forecast.Arima(model3, h = 46)
 
-par(mfrow = c(1, 2))
 plot(training$usage ~ training$day, xlim = c(0,nrow(example0_ordered)), col = "blue", type = 'o')
 lines(testing$usage ~ testing$day, col = "green", type = 'o')
 abline(model2, col = "red")
@@ -461,9 +469,9 @@ lines(model2_forecast[ ,2], lty = 'dashed', col = 'red')
 plot(training$usage ~ training$day, xlim = c(0,nrow(example0_ordered)), col = "blue", type = 'o')
 lines(testing$usage ~ testing$day, col = "green", type = 'o')
 par(new=TRUE)
-plot(model3_forecast, col = color, shaded=TRUE, shadecols = color, fcol = "red")
+plot(model3_forecast, col = color, axes = FALSE, shaded=TRUE, shadecols = color, fcol = "red")
 par(new=F)
 
 ```
 
-As we can see from the plots, linear model that was built on smaller ammount of data points is absolytelly different to the previous one. At the same time, ARIMA (2,0,0) model gives acceptable results.  
+As we can see from the plots, linear model that was built on smaller ammount of data points is absolutelly different from the previous one. At the same time, ARIMA (2,0,0) model still gives acceptable results.  
